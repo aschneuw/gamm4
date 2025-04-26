@@ -478,12 +478,20 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
 
 
 
-print.gamm4.version <- function()
-{ library(help=gamm4)$info[[1]] -> version
-  version <- version[pmatch("Version",version)]
-  um <- strsplit(version," ")[[1]]
-  version <- um[nchar(um)>0][2]
-  hello <- paste("This is gamm4 ",version,"\n",sep="")
+print.gamm4.version <- function() {
+  if (requireNamespace("gamm4", quietly = TRUE)) {
+    version_info <- packageDescription("gamm4")$Version
+  } else {
+    # fallback: try to read DESCRIPTION manually (for devtools::load_all)
+    desc_path <- file.path(dirname(sys.frame(1)$ofile), "..", "DESCRIPTION")
+    if (file.exists(desc_path)) {
+      dcf <- read.dcf(desc_path)
+      version_info <- dcf[1, "Version"]
+    } else {
+      version_info <- "unknown"
+    }
+  }
+  hello <- paste("This is gamm4 ", version_info, "\n", sep = "")
   packageStartupMessage(hello)
 }
 
@@ -493,4 +501,3 @@ print.gamm4.version <- function()
 }
 
 .onUnload <- function(libpath) {}
-
