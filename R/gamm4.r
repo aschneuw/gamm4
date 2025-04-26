@@ -244,14 +244,13 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
     ## Create the deviance function to be optimized:
     devfun <- do.call(mkLmerDevfun, b)
     ## Optimize the deviance function:
-    opt <- optimizeLmer(devfun,start=start,verbose=verbose,control=control$optCtrl) ## previously bobyqa optimizer set, but now default
-    ## Package up the results:
+    opt <- optimizeLmer(devfun,start=start,verbose=verbose,control=control$optCtrl,optimizer=control$optimizer)
     ret$mer <- mkMerMod(environment(devfun), opt, b$reTrms, fr = b$fr)
   } else { ## generalized case...
     ## Create the deviance function for optimizing over theta:
     devfun <- do.call(mkGlmerDevfun, b)
     ## Optimize over theta using a rough approximation (i.e. nAGQ = 0):
-    opt <- optimizeGlmer(devfun,start=start,verbose=verbose,control=control$optCtrl)
+    opt <- optimizeGlmer(devfun,start=start,verbose=verbose,control=control$optCtrl,optimizer=control$optimizer)
     ## Update the deviance function for optimizing over theta and beta:
     devfun <- updateGlmerDevfun(devfun, b$reTrms)
     ## Optimize over theta and beta:
