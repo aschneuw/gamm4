@@ -286,8 +286,8 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
     Xfp <- G$Xf
     ## Transform  parameters back to the original space....
     bf <- as.numeric(lme4::fixef(ret$mer)) ## the fixed effects
-    br <- lme4::ranef(ret$mer) ## a named list
-    if (G$nsdf) p <- bf[1:G$nsdf] else p <- array(0,0) ## fixed parametric component
+    br <- lme4::ranef(ret$mer, condVar=FALSE) ## a named list
+    if (G$nsdf) p <- bf[1:G$nsdf] else p <- array(0,0) ## fixed parametric componet
     if (G$m>0) for (i in 1:G$m) {
       fx <- G$smooth[[i]]$fixed 
       first <- G$smooth[[i]]$first.f.para; last <- G$smooth[[i]]$last.f.para
@@ -470,11 +470,6 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
     ret
 
 } ## end of gamm4
-
-
-
-
-
 
 
 print.gamm4.version <- function() {
