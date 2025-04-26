@@ -221,17 +221,55 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
   b <- if (linear) lFormula(lme4.formula,data=mf,weights=G$w,REML=REML,control=control,...) else 
                    glFormula(lme4.formula,data=mf,family=family,weights=G$w,control=control,...)
 
- 
-  if (n.sr) { ## Fabian Scheipl's trick of overwriting dummy slots revised for new structure
-     tn <- names(b$reTrms$cnms) ## names associated with columns of Z (same order as Gp)
-     ind <- 1:length(tn)
-     sn <- names(G$random) ## names of smooth random components
-     for (i in 1:n.sr) { ## loop through random effect smooths
-       k <- ind[sn[i]==tn] ## which term should contain G$random[[i]] 
-       ii <- (b$reTrms$Gp[k]+1):b$reTrms$Gp[k+1]
-       b$reTrms$Zt[ii,] <- as(t(G$random[[i]]),"dgCMatrix")
-       b$reTrms$cnms[[k]] <- attr(G$random[[i]],"s.label") 
-     }
+    ## loop through random effect smooths and ingest them into Z
+  if (n.sr) {
+    tn <- names(b$reTrms$cnms) ## names associated with columns of Z (same order as Gp)
+    ind <- 1:length(tn)
+    sn <- names(G$random)
+
+    sparse_summary <- as.data.frame(summary(b$reTrms$Zt))
+    sparse_dims <- dim(b$reTrms$Zt)
+
+    for (i in 1:n.sr) {
+      k <- ind[sn[i]==tn] ## which term (variable) name represents random smooth i
+
+      # Step 1: Extract indices and values from the transposed matrix
+      indices <- which(t(G$random[[i]]) != 0, arr.ind = TRUE)
+      values <- t(G$random[[i]])[indices]
+      
+      # Step 2: Create dense summary DataFrame
+      dense_summary <- data.frame(i = indices[, 1], j = indices[, 2], x = values)
+      
+      # Step 3: Adjust row indices according to b$reTrms$Gp[k]
+      dense_summary$i <- dense_summary$i + b$reTrms$Gp[k]
+      
+      # Step 4: Remove rows from sparse_summary that have the same (i, j) as in dense_summary
+      filtered_sparse_summary <- sparse_summary[!paste(sparse_summary$i, sparse_summary$j) %in% paste(dense_summary$i, dense_summary$j), ]
+      
+      # Step 5: Combine the filtered sparse summary with the dense summary
+      combined_summary <- rbind(filtered_sparse_summary, dense_summary)
+
+      # Step 6: Update sparse_summary
+      sparse_summary <- combined_summary
+      
+      # Step 7: Update labels
+      b$reTrms$cnms[[k]] <- attr(G$random[[i]],"s.label") 
+      }
+
+    # Create the new sparse matrix
+    new_sparse_mat <- sparseMatrix(
+          i = sparse_summary$i,
+          j = sparse_summary$j,
+          x = sparse_summary$x,
+          dims = c(sparse_dims[1], sparse_dims[2])
+        )
+        
+    # Assign row and column names from the original matrix
+    rownames(new_sparse_mat) <- rownames(b$reTrms$Zt)
+    colnames(new_sparse_mat) <- colnames(b$reTrms$Zt)
+
+    # Replace old Zt with the updated one
+    b$reTrms$Zt <- new_sparse_mat
   }
 
   ## now do the actual fitting...
