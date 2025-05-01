@@ -117,7 +117,7 @@ gamm4.setup<-function(formula,pterms,
 
 gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL,
       subset=NULL,na.action,knots=NULL,drop.unused.levels=TRUE,REML=TRUE,
-      control=NULL,start=NULL,verbose=0L,nAGQ=1L,...) {
+      control=NULL,start=NULL,verbose=0L,nAGQ=1L,python_cholmod=FALSE,...) {
 # Routine to fit a GAMM to some data. Fixed and smooth terms are defined in the formula, but the wiggly 
 # parts of the smooth terms are treated as random effects. The onesided formula random defines additional 
 # random terms. 
@@ -135,7 +135,7 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
  
   mf$formula <- gp$fake.formula
   mf$REML <- mf$verbose <- mf$control <- mf$start <- mf$family <- mf$scale <-
-             mf$knots <- mf$random <- mf$nAGQ <- mf$... <-NULL ## mf$weights?
+             mf$knots <- mf$random <- mf$nAGQ <- mf$python_cholmod <- mf$... <-NULL ## mf$weights?
   mf$drop.unused.levels <- drop.unused.levels
   mf[[1]] <- as.name("model.frame")
   pmf <- mf
@@ -427,18 +427,34 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
 
     ## NOTE: Cholesky probably better in the following - then pivoting 
     ##       automatic when solving....
-    #R <- Matrix::chol(V,pivot=TRUE);piv <- attr(R,"pivot") ## from >1.6-2 pivot not returned!?
-    R <- mgcv::mchol(V);piv <- attr(R,"pivot") 
+
+    if (python_cholmod) {
+      library(reticulate)
+      py_require(packages="scikit-sparse>=0.4.16")
+      cholmod <- import("sksparse.cholmod")
+      R <- cholmod$cholesky(V)
+    } else {
+      R <- mgcv::mchol(V);piv <- attr(R,"pivot")
+    }
+
     G$Xf <- as(G$Xf,"dgCMatrix")
     Xfp <- as(Xfp,"dgCMatrix")
     
-    if (is.null(piv)) {
-      WX <- as(solve(t(R),Xfp),"matrix")    ## V^{-.5}Xp -- fit parameterization
-      XVX <- as(solve(t(R),G$Xf),"matrix")  ## same in original parameterization 
+    if (python_cholmod) {
+      WX <- as.matrix(R$solve_Lt(Xfp,use_LDLt_decomposition=FALSE))
+      XVX <- as.matrix(R$solve_Lt(G$Xf,use_LDLt_decomposition=FALSE))
     } else {
+
+      if (is.null(piv)) {
+      WX <- as(solve(t(R),Xfp),"matrix")    ## V^{-.5}Xp -- fit parameterization
+      XVX <- as(solve(t(R),G$Xf),"matrix")  ## same in original parameterization
+
+      } else {
       WX <- as(solve(t(R),Xfp[piv,]),"matrix")    ## V^{-.5}Xp -- fit parameterization
       XVX <- as(solve(t(R),G$Xf[piv,]),"matrix")  ## same in original parameterization
+      }
     }
+
     qrz <- qr(XVX,LAPACK=TRUE)
     object$R <- qr.R(qrz);object$R[,qrz$pivot] <- object$R
 
