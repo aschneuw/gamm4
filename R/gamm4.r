@@ -237,14 +237,18 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
       indices <- which(t(G$random[[i]]) != 0, arr.ind = TRUE)
       values <- t(G$random[[i]])[indices]
       
-      # Step 2: Create dense summary DataFrame
+      # Step 2: Create dense summary DataFrame for the smooth submatrix
       dense_summary <- data.frame(i = indices[, 1], j = indices[, 2], x = values)
       
       # Step 3: Adjust row indices according to b$reTrms$Gp[k]
       dense_summary$i <- dense_summary$i + b$reTrms$Gp[k]
+      #ii <- (b$reTrms$Gp[k]+1):b$reTrms$Gp[k+1]
+      #message("Debug: ii ", ii)
+      #message("Debug: summary ", dense_summary$i)
+
       
-      # Step 4: Remove rows from sparse_summary that have the same (i, j) as in dense_summary
-      filtered_sparse_summary <- sparse_summary[!paste(sparse_summary$i, sparse_summary$j) %in% paste(dense_summary$i, dense_summary$j), ]
+      # Step 4: Remove rows from sparse_summary that have the same i as in dense_summary
+      filtered_sparse_summary <- sparse_summary[!(sparse_summary$i %in% dense_summary$i), ]
       
       # Step 5: Combine the filtered sparse summary with the dense summary
       combined_summary <- rbind(filtered_sparse_summary, dense_summary)
@@ -349,28 +353,29 @@ gamm4 <- function(formula,random=NULL,family=gaussian(),data=list(),weights=NULL
          B[ind,ind] <- t(D*t(G$smooth[[i]]$trans.U))
       }
       ## and finally transform G$Xf into fitting parameterization...
-      rep <- G$Xf[,ind,drop=FALSE]%*%B[ind,ind,drop=FALSE]
+      Xfp[,ind] <- as.matrix(G$Xf[,ind,drop=FALSE]%*%B[ind,ind,drop=FALSE])
+      #rep <- G$Xf[,ind,drop=FALSE]%*%B[ind,ind,drop=FALSE]
 
       # sparse summaries
-      sum_rep <- summary(rep)
-      sum_Xfp <- summary(Xfp)
+      #sum_rep <- summary(rep)
+      #sum_Xfp <- summary(Xfp)
 
       # replace column indexes in rep
-      sum_rep$j <- ind[sum_rep$j]
+      #sum_rep$j <- ind[sum_rep$j]
 
       # remove columns from orig
-      sum_Xfp <- subset(sum_Xfp, !(j %in% ind))
+      #sum_Xfp <- subset(sum_Xfp, !(j %in% ind))
 
       # merge
-      sum_comb <- rbind(sum_Xfp, sum_rep)
+      #sum_comb <- rbind(sum_Xfp, sum_rep)
 
       # recreate updated sparse matrix
-      Xfp <- sparseMatrix(
-        i = sum_comb$i,
-        j = sum_comb$j,
-        x = sum_comb$x,
-        dims = dim(Xfp)
-      )
+      #Xfp <- sparseMatrix(
+      #  i = sum_comb$i,
+      #  j = sum_comb$j,
+      #  x = sum_comb$x,
+      #  dims = dim(Xfp)
+      #)
     }
  
     object$coefficients <- p
